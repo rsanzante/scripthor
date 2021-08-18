@@ -17,7 +17,9 @@ use Composer\Plugin\CommandEvent;
 class Handler {
 
   const DIR = './scripts';
-  const ENV_FILE = './.env';
+  const ENV_FILE_TEMPLATE = 'env';
+  const ENV_EXAMPLE_FILE = './' . self::ENV_FILE_TEMPLATE . '.example';
+  const ENV_FILE = './.' . self::ENV_FILE_TEMPLATE;
 
   const TARGET_DIR = '../vendor/metadrop/scripthor/bin/';
 
@@ -140,8 +142,9 @@ class Handler {
   protected function setUpEnvFile() {
     $current_dir = basename(getcwd());
     $project_name = $this->io->ask('Please enter the project name (default to ' . $current_dir . '): ', $current_dir);
+    // @TODO: Validate $project_name.
     $this->io->write('Setting up .env file');
-    $env = file_get_contents(self::ENV_FILE . '.example');
+    $env = file_get_contents(self::ENV_EXAMPLE_FILE);
     $env = str_replace('example', $project_name, $env);
 
     $theme_name = str_replace('-', '_', $project_name);
