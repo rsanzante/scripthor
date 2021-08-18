@@ -47,6 +47,20 @@ class Handler {
   protected $io;
 
   /**
+   * Whether Drupal has been installed by the assistant or not.
+   *
+   *  @var bool
+   */
+  protected $drupalInstalled = FALSE;
+
+  /**
+   * Whether a git repository has been initialized by the assistant or not.
+   *
+   *  @var bool
+   */
+  protected $gitRepoInitialized = FALSE;
+
+  /**
    * Handler constructor.
    *
    * @param \Composer\Composer $composer
@@ -116,9 +130,13 @@ class Handler {
     $this->setUpGit();
     $this->startDocker($theme_name);
     $this->initGrumPhp();
-    $this->installDrupal($project_name);
-    $this->createDirectories();
-    $this->createSubTheme($theme_name);
+
+    if ($this->io->askConfirmation('Do you want to install Drupal? (Y/n) ')) {
+      $this->installDrupal($project_name);
+      $this->createDirectories();
+      $this->createSubTheme($theme_name);
+    }
+
     $this->assistantSuccess($project_name);
   }
 
@@ -171,6 +189,7 @@ class Handler {
     if ($this->io->askConfirmation('Do you want to initialize a git repository for your new project? (Y/n) ')) {
       system('git init');
       system('git checkout -b dev');
+      $this->gitRepoInitialized = TRUE;
     }
   }
 
@@ -196,13 +215,12 @@ class Handler {
    * Install Drupal with the standard profile.
    */
   protected function installDrupal($project_name) {
-    if ($this->io->askConfirmation('Do you want to install Drupal? (Y/n) ')) {
-      copy('./web/sites/default/example.settings.local.php', './web/sites/default/settings.local.php');
-      $drush_yml = file_get_contents('./web/sites/default/example.local.drush.yml');
-      $drush_yml = str_replace('example', $project_name, $drush_yml);
-      file_put_contents('./web/sites/default/local.drush.yml', $drush_yml);
-      system('docker-compose exec php drush si');
-    }
+    copy('./web/sites/default/example.settings.local.php', './web/sites/default/settings.local.php');
+    $drush_yml = file_get_contents('./web/sites/default/example.local.drush.yml');
+    $drush_yml = str_replace('example', $project_name, $drush_yml);
+    file_put_contents('./web/sites/default/local.drush.yml', $drush_yml);
+    system('docker-compose exec php drush si');
+    $this->drupalInstalled = TRUE;
   }
 
   /**
@@ -224,14 +242,27 @@ class Handler {
    */
   protected function assistantSuccess($project_name) {
     $port = shell_exec('docker-compose port traefik 80 | cut -d: -f2');
-    system('git add .');
-    system('git commit -m "Initial commit" -n');
-    $this->io->write("\n\n" . '***********************'
-      . "\n" . '    CONGRATULATIONS!'
-      . "\n". '***********************'
-      . "\n" . 'Your new project is up and running on the following url: http://' . $project_name . '.docker.localhost:' . $port);
-    $this->io->write('Click on the following link to start building your site:');
-    system('docker-compose exec php drush uli');
-  }
 
+    if ($this->gitRepoInitialized) {
+      system('git add .');
+      system('git commit -m "Initial commit" -n');
+    }
+
+    if ($this->drupalInstalled) {
+      $this->io->write("\n\n" . '***********************'
+        . "\n" . '    CONGRATULATIONS!'
+        . "\n". '***********************'
+        . "\n" . 'Your new project is up and running on the following url: http://' . $project_name . '.docker.localhost:' . $port);
+      $this->io->write('Click on the following link to start building your site:');
+      system('docker-compose exec php drush uli');
+    }
+    else {
+      $this->io->write("\n\n" . '***********************'
+        . "\n" . '    CONGRATULATIONS!'
+        . "\n". '***********************'
+        . "\n" . 'Your new project is ready! The project URL is: http://' . $project_name . '.docker.localhost:' . $port
+        . "\n" . 'This assistant have not installed Drupal so you need to manually it manually');
+    }
+
+  }
 }
